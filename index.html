@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel One — 1 Person = 1 Pixel</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            night: '#0B0F1A',
+            panel: '#131A2B',
+            panelLight: '#1B253D',
+            line: '#263352',
+            euroBlue: '#2563EB',
+            euroGold: '#FACC15',
+            neonMint: '#10B981'
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background: radial-gradient(circle at top left, #152242 0%, #0B0F1A 55%, #080B14 100%);
+      color: #F1F5F9;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    canvas#pixelCanvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      touch-action: none;
+    }
+    .swatch-active {
+      box-shadow: 0 0 0 2px #0B0F1A, 0 0 0 4px #FACC15;
+      transform: scale(1.12);
+    }
+    .toast-enter {
+      animation: toastSlide 0.25s ease-out forwards;
+    }
+    @keyframes toastSlide {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <script id="bakedDotsConfig">window.__BAKED_DOTS_CONFIG__ = {"publicOnly": true, "firebaseUrl": "https://pixel-one-7311d-default-rtdb.europe-west1.firebasedatabase.app"};</script>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-euroBlue selection:text-white">
+
+  <!-- Top Navigation -->
+  <header class="sticky top-0 z-40 bg-night/90 backdrop-blur-md border-b border-line">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-euroBlue to-indigo-600 flex items-center justify-center shadow-lg text-lg">🇪🇺</div>
+        <div class="leading-tight">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold tracking-tight text-white text-base sm:text-lg">Pixel One</span>
+            <span id="roleBadge" class="px-2 py-0.5 rounded bg-euroGold/15 border border-euroGold/40 text-euroGold text-[10px] font-bold uppercase tracking-wider">АВТОР • МАР'ЯН</span>
+          </div>
+          <div id="headerSub" class="text-[11px] text-slate-400">Натисни на будь-яку крапку, щоб побачити країну</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <span id="syncPill" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-panel border border-line text-[11px] font-semibold text-slate-300">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-euroGold"></span>
+          <span id="syncLabel">Local</span>
+        </span>
+        <!-- Switcher for Marian to preview Participant view (completely hidden in exported index.html) -->
+        <button type="button" id="toggleRolePreviewBtn" class="px-3 py-1.5 rounded-lg bg-euroBlue/20 hover:bg-euroBlue/35 border border-euroBlue/40 text-blue-200 text-xs font-bold transition inline-flex items-center gap-1.5">
+          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          <span id="toggleRoleLabel">Режим учасника</span>
+        </button>
+        <button type="button" id="langToggleBtn" class="px-3 py-1.5 rounded-lg bg-panel hover:bg-panelLight border border-line text-xs font-bold text-white transition">🇺🇦 UA</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 space-y-5">
+
+    <!-- ==================== CREATOR STATS STRIP (ONLY FOR MARIAN) ==================== -->
+    <section id="creatorStatsBar" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-panel rounded-2xl p-4 border border-line flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-400">Дивилося людей</div>
+          <div id="statViews" class="text-2xl font-extrabold text-white mt-0.5">0</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-euroBlue flex items-center justify-center">
+          <i data-lucide="eye" class="w-5 h-5"></i>
+        </div>
+      </div>
+      <div class="bg-panel rounded-2xl p-4 border border-line flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-400">Поставили крапки</div>
+          <div id="statDots" class="text-2xl font-extrabold text-euroGold mt-0.5">0</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-yellow-500/15 text-euroGold flex items-center justify-center">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+      </div>
+      <div class="bg-panel rounded-2xl p-4 border border-line flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-400">Країн на стіні</div>
+          <div id="statCountries" class="text-2xl font-extrabold text-neonMint mt-0.5">0</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-neonMint flex items-center justify-center">
+          <i data-lucide="globe" class="w-5 h-5"></i>
+        </div>
+      </div>
+      <div class="bg-panel rounded-2xl p-4 border border-line flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-400">Вільних клітинок</div>
+          <div id="statFreeCells" class="text-2xl font-extrabold text-slate-200 mt-0.5">2560</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-panelLight text-slate-300 flex items-center justify-center">
+          <i data-lucide="grid" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PARTICIPANT IDENTITY BAR (ONLY FOR PARTICIPANTS) ==================== -->
+    <section id="participantBar" class="hidden bg-panel rounded-2xl p-4 border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="text-xs font-bold text-slate-300" data-i18n="choose_country">Твоя країна:</span>
+        <select id="visitorCountrySelect" aria-label="Країна" class="px-3 py-2 rounded-xl bg-panelLight border border-line text-sm font-semibold text-white focus:outline-none focus:border-euroBlue"></select>
+      </div>
+      <div id="participantStatusPill" class="px-3.5 py-2 rounded-xl bg-euroBlue/15 border border-euroBlue/40 text-blue-200 text-xs sm:text-sm font-semibold">
+        Обери колір і постав 1 свою крапку у вільному місці
+      </div>
+    </section>
+
+    <!-- ==================== MAIN STAGE ==================== -->
+    <div class="grid lg:grid-cols-12 gap-5 items-start">
+
+      <!-- PIXEL CANVAS CARD -->
+      <div id="canvasCol" class="lg:col-span-8 bg-panel rounded-2xl border border-line overflow-hidden shadow-xl flex flex-col">
+        <!-- Toolbar -->
+        <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2 bg-panelLight/50">
+          <div class="flex items-center gap-2 text-xs text-slate-300">
+            <span class="px-2 py-0.5 rounded bg-euroBlue/20 border border-euroBlue/40 text-blue-300 font-mono font-bold" id="coordReadout">X: — Y: —</span>
+            <span id="canvasModeHint" class="text-slate-400">Клікни на крапку, щоб побачити країну</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" id="toggleGridBtn" class="px-2.5 py-1.5 rounded-lg bg-panel border border-line hover:bg-panelLight text-xs font-semibold text-slate-200 transition" data-i18n="btn_grid">Сітка</button>
+            <button type="button" id="zoomOutBtn" class="p-1.5 rounded-lg bg-panel border border-line hover:bg-panelLight text-slate-200 transition" aria-label="Zoom out"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+            <button type="button" id="zoomResetBtn" class="px-2 py-1.5 rounded-lg bg-panel border border-line hover:bg-panelLight text-xs font-mono text-slate-200 transition">100%</button>
+            <button type="button" id="zoomInBtn" class="p-1.5 rounded-lg bg-panel border border-line hover:bg-panelLight text-slate-200 transition" aria-label="Zoom in"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+            <button type="button" id="downloadPngBtn" class="px-2.5 py-1.5 rounded-lg bg-euroBlue hover:bg-blue-500 text-white text-xs font-bold inline-flex items-center gap-1 transition">
+              <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">PNG</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Viewport -->
+        <div id="canvasViewport" class="relative w-full overflow-auto bg-[#070A12] flex items-center justify-center p-3 sm:p-5 min-h-[340px] sm:min-h-[450px]">
+          <canvas id="pixelCanvas" class="rounded-lg shadow-2xl border border-line cursor-crosshair bg-[#0F172A]"></canvas>
+        </div>
+
+        <!-- Color Palette (Visible to Participants to pick their 1 dot color) -->
+        <div id="paletteBar" class="hidden px-4 py-3.5 border-t border-line bg-panelLight/40 flex flex-wrap items-center justify-between gap-3">
+          <div id="colorPalette" class="flex flex-wrap items-center gap-2"></div>
+          <span class="text-xs text-slate-400" data-i18n="one_dot_rule">1 учасник = 1 піксель у вільному місці</span>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: CREATOR INSPECTOR + COUNTRIES + FIREBASE & 2-FILE EXPORT (ONLY FOR MARIAN) -->
+      <aside id="creatorSidebar" class="lg:col-span-4 space-y-4">
+
+        <!-- Clicked Dot Inspector (ONLY shows when Marian clicks a dot!) -->
+        <div class="bg-panel rounded-2xl border border-euroGold/40 p-4 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-sm text-white flex items-center gap-2">
+              <i data-lucide="crosshair" class="w-4 h-4 text-euroGold"></i>
+              <span>Інспектор крапки</span>
+            </h3>
+            <span id="inspectedCoord" class="text-xs font-mono text-slate-400">—</span>
+          </div>
+          <div id="dotInspectorEmpty" class="text-xs text-slate-400 py-2">
+            Натисни на будь-яку поставлену крапку на полотні — тут одразу покаже, з якої вона країни.
+          </div>
+          <div id="dotInspectorDetails" class="hidden bg-night rounded-xl p-3.5 border border-line space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span id="inspectedFlag" class="text-3xl leading-none">🇺🇦</span>
+                <div>
+                  <div id="inspectedCountry" class="font-extrabold text-base text-white">Ukraine</div>
+                  <div id="inspectedTime" class="text-[11px] text-slate-400">12:00</div>
+                </div>
+              </div>
+              <span id="inspectedColorSwatch" class="w-6 h-6 rounded-lg border border-white/20 shrink-0"></span>
+            </div>
+            <button type="button" id="deleteInspectedDotBtn" class="w-full py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-bold transition">
+              Видалити цю крапку
+            </button>
+          </div>
+        </div>
+
+        <!-- Countries Breakdown -->
+        <div class="bg-panel rounded-2xl border border-line p-4 space-y-3">
+          <h3 class="font-bold text-sm text-white flex items-center gap-2">
+            <i data-lucide="flag" class="w-4 h-4 text-neonMint"></i>
+            <span>З яких країн ставили крапки</span>
+          </h3>
+          <div id="countryLeaderboard" class="space-y-2 text-xs max-h-44 overflow-y-auto"></div>
+        </div>
+
+        <!-- Firebase Sync & Separate 2-File Export -->
+        <div class="bg-panel rounded-2xl border border-line p-4 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-sm text-white">Синхронізація + 2 файли</h3>
+            <span id="adminSyncBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-panelLight text-slate-300">Локально</span>
+          </div>
+          <form id="cloudForm" class="space-y-2">
+            <input type="url" id="adminFirebaseUrl" placeholder="Firebase Realtime Database URL..." class="w-full px-3 py-2 rounded-xl bg-night border border-line text-xs font-mono text-white" />
+            <div class="flex gap-2">
+              <button type="submit" class="flex-1 py-1.5 rounded-lg bg-neonMint hover:bg-emerald-500 text-night text-xs font-extrabold transition">Підключити</button>
+              <button type="button" id="testFbBtn" class="px-3 py-1.5 rounded-lg bg-panelLight hover:bg-line text-white text-xs font-semibold transition">Тест</button>
+            </div>
+          </form>
+
+          <div class="pt-2 border-t border-line space-y-2">
+            <button type="button" id="exportPublicBtn" class="w-full py-2 px-3 rounded-xl bg-euroBlue hover:bg-blue-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <i data-lucide="globe" class="w-4 h-4"></i>
+              <span>1. Завантажити index.html (Pixel One)</span>
+            </button>
+            <button type="button" id="exportAdminBtn" class="w-full py-2 px-3 rounded-xl bg-panelLight hover:bg-line border border-line text-white text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <i data-lucide="crown" class="w-4 h-4 text-euroGold"></i>
+              <span>2. Завантажити admin.html (для мене)</span>
+            </button>
+            <button type="button" id="adminClearCanvasBtn" class="w-full py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[11px] font-semibold transition">
+              Очистити все полотно
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="border-t border-line bg-night/80 mt-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-xs text-slate-400">
+      <span><strong>Pixel One</strong> • Created by <strong class="text-white">Marian</strong> 🇺🇦</span>
+      <span data-i18n="footer_rule">1 person = 1 pixel</span>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'eurodots_2026_v1';
+      const PLACED_KEY = 'eurodots_user_placed_v1';
+      const GRID_W = 64;
+      const GRID_H = 40;
+      const TOTAL_CELLS = GRID_W * GRID_H;
+
+      const COUNTRIES = [
+        { code: 'UA', flag: '🇺🇦', name: 'Ukraine' },
+        { code: 'PL', flag: '🇵🇱', name: 'Poland' },
+        { code: 'DE', flag: '🇩🇪', name: 'Germany' },
+        { code: 'FR', flag: '🇫🇷', name: 'France' },
+        { code: 'GB', flag: '🇬🇧', name: 'United Kingdom' },
+        { code: 'IT', flag: '🇮🇹', name: 'Italy' },
+        { code: 'ES', flag: '🇪🇸', name: 'Spain' },
+        { code: 'CZ', flag: '🇨🇿', name: 'Czechia' },
+        { code: 'NL', flag: '🇳🇱', name: 'Netherlands' },
+        { code: 'SE', flag: '🇸🇪', name: 'Sweden' },
+        { code: 'NO', flag: '🇳🇴', name: 'Norway' },
+        { code: 'LT', flag: '🇱🇹', name: 'Lithuania' },
+        { code: 'LV', flag: '🇱🇻', name: 'Latvia' },
+        { code: 'EE', flag: '🇪🇪', name: 'Estonia' },
+        { code: 'AT', flag: '🇦🇹', name: 'Austria' },
+        { code: 'CH', flag: '🇨🇭', name: 'Switzerland' },
+        { code: 'RO', flag: '🇷🇴', name: 'Romania' },
+        { code: 'PT', flag: '🇵🇹', name: 'Portugal' },
+        { code: 'EU', flag: '🇪🇺', name: 'Other Europe' }
+      ];
+
+      const PALETTE = [
+        '#0057B7', '#FFD700', '#EF4444', '#F97316',
+        '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6',
+        '#EC4899', '#FFFFFF', '#94A3B8', '#84CC16'
+      ];
+
+      const I18N = {
+        uk: {
+          choose_country: 'Твоя країна:',
+          btn_grid: 'Сітка',
+          one_dot_rule: '1 учасник = 1 піксель у вільному місці',
+          footer_rule: '1 людина = 1 крапка',
+          part_ready: 'Обери колір і постав 1 свою крапку у вільному місці',
+          part_done: 'Твою крапку поставлено! Дякуємо за участь у Pixel One',
+          hint_creator: 'Натисни на будь-яку крапку, щоб побачити країну',
+          hint_part: 'Обери вільну клітинку та натисни, щоб поставити свій піксель'
+        },
+        en: {
+          choose_country: 'Your country:',
+          btn_grid: 'Grid',
+          one_dot_rule: '1 participant = 1 pixel on an empty cell',
+          footer_rule: '1 person = 1 pixel',
+          part_ready: 'Pick a color and place your 1 pixel on an empty spot',
+          part_done: 'Your pixel is placed! Thank you for joining Pixel One',
+          hint_creator: 'Click any dot to see its country',
+          hint_part: 'Pick an empty cell and click to place your 1 pixel'
+        }
+      };
+
+      let state = {
+        lang: 'uk',
+        role: 'creator', // 'creator' or 'participant'
+        selectedColor: '#0057B7',
+        showGrid: true,
+        zoom: 1,
+        visitorCountry: 'UA',
+        pixels: {}, // "x,y": { color, country, flag, time }
+        views: 0,
+        selectedDotKey: null,
+        firebaseUrl: '',
+        pollTimer: null
+      };
+
+      function isPublicFile() {
+        return Boolean(window.__BAKED_DOTS_CONFIG__ && window.__BAKED_DOTS_CONFIG__.publicOnly);
+      }
+
+      function isCreatorMode() {
+        return !isPublicFile() && state.role === 'creator';
+      }
+
+      function cleanFbUrl(url) {
+        return String(url || '').trim().replace(/\/+$/, '');
+      }
+
+      function escapeHTML(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function nowStr() {
+        const d = new Date();
+        return d.toLocaleDateString('uk-UA') + ' ' + d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+      }
+
+      function getUserPlacedKey() {
+        try { return localStorage.getItem(PLACED_KEY) || ''; } catch (e) { return ''; }
+      }
+
+      function setUserPlacedKey(key) {
+        try { localStorage.setItem(PLACED_KEY, key); } catch (e) {}
+      }
+
+      function showToast(msg) {
+        const c = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        el.className = 'toast-enter pointer-events-auto bg-panelLight text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg border border-line flex items-center gap-2';
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-euroGold shrink-0"></span><span>' + escapeHTML(msg) + '</span>';
+        c.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transition = 'opacity 0.25s ease';
+          setTimeout(() => el.remove(), 260);
+        }, 2600);
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const p = JSON.parse(raw);
+            if (p.pixels && typeof p.pixels === 'object') state.pixels = p.pixels;
+            if (typeof p.views === 'number') state.views = p.views;
+            if (p.firebaseUrl) state.firebaseUrl = p.firebaseUrl;
+            if (p.visitorCountry) state.visitorCountry = p.visitorCountry;
+            if (p.lang) state.lang = p.lang;
+          }
+        } catch (e) {}
+
+        if (window.__BAKED_DOTS_CONFIG__) {
+          const bc = window.__BAKED_DOTS_CONFIG__;
+          if (bc.firebaseUrl) state.firebaseUrl = bc.firebaseUrl;
+          if (bc.publicOnly) state.role = 'participant';
+        }
+      }
+
+      function saveState(skipCloud) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            pixels: state.pixels,
+            views: state.views,
+            firebaseUrl: state.firebaseUrl,
+            visitorCountry: state.visitorCountry,
+            lang: state.lang
+          }));
+        } catch (e) {}
+        if (!skipCloud && cleanFbUrl(state.firebaseUrl)) {
+          cloudPush();
+        }
+      }
+
+      function updateSyncUI(ok) {
+        const dot = document.getElementById('syncDot');
+        const label = document.getElementById('syncLabel');
+        const badge = document.getElementById('adminSyncBadge');
+        if (!cleanFbUrl(state.firebaseUrl)) {
+          dot.className = 'w-2 h-2 rounded-full bg-euroGold';
+          label.textContent = 'Local';
+          if (badge) badge.textContent = 'Локально';
+        } else if (ok) {
+          dot.className = 'w-2 h-2 rounded-full bg-neonMint animate-pulse';
+          label.textContent = 'LIVE Europe';
+          if (badge) badge.textContent = 'Онлайн (Firebase ✓)';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-red-500';
+          label.textContent = 'Offline';
+          if (badge) badge.textContent = 'Помилка';
+        }
+      }
+
+      async function cloudPull(silent) {
+        const base = cleanFbUrl(state.firebaseUrl);
+        if (!base || !base.startsWith('https://')) return false;
+        try {
+          const res = await fetch(base + '/eurodots.json');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          if (data && typeof data === 'object') {
+            if (data.pixels && typeof data.pixels === 'object') state.pixels = data.pixels;
+            if (typeof data.views === 'number') state.views = data.views;
+            saveState(true);
+            renderAll();
+          }
+          updateSyncUI(true);
+          return true;
+        } catch (err) {
+          updateSyncUI(false);
+          if (!silent) showToast('Помилка підключення до Firebase');
+          return false;
+        }
+      }
+
+      async function cloudPush() {
+        const base = cleanFbUrl(state.firebaseUrl);
+        if (!base || !base.startsWith('https://')) return false;
+        try {
+          const res = await fetch(base + '/eurodots.json', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pixels: state.pixels, views: state.views })
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          updateSyncUI(true);
+          return true;
+        } catch (err) {
+          updateSyncUI(false);
+          return false;
+        }
+      }
+
+      function startPolling() {
+        if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+        if (cleanFbUrl(state.firebaseUrl)) {
+          cloudPull(true);
+          state.pollTimer = setInterval(() => cloudPull(true), 4000);
+        }
+      }
+
+      window.addEventListener('storage', e => {
+        if (e.key === STORAGE_KEY) { loadState(); renderAll(); }
+      });
+
+      // ==================== CANVAS ====================
+      const canvas = document.getElementById('pixelCanvas');
+      const ctx = canvas.getContext('2d');
+
+      function getCellSize() {
+        const vp = document.getElementById('canvasViewport');
+        const availW = Math.max(280, (vp ? vp.clientWidth : 640) - 32);
+        const baseCell = Math.max(6, Math.floor(availW / GRID_W));
+        return Math.max(5, Math.round(baseCell * state.zoom));
+      }
+
+      function drawCanvas() {
+        const cell = getCellSize();
+        canvas.width = GRID_W * cell;
+        canvas.height = GRID_H * cell;
+
+        ctx.fillStyle = '#0F172A';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        Object.keys(state.pixels).forEach(key => {
+          const p = state.pixels[key];
+          if (!p || !p.color) return;
+          const [x, y] = key.split(',').map(Number);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(x * cell, y * cell, cell, cell);
+        });
+
+        if (state.showGrid && cell >= 6) {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.13)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let x = 0; x <= GRID_W; x++) {
+            ctx.moveTo(x * cell + 0.5, 0);
+            ctx.lineTo(x * cell + 0.5, canvas.height);
+          }
+          for (let y = 0; y <= GRID_H; y++) {
+            ctx.moveTo(0, y * cell + 0.5);
+            ctx.lineTo(canvas.width, y * cell + 0.5);
+          }
+          ctx.stroke();
+        }
+
+        // Highlight inspected dot for Marian ONLY
+        if (isCreatorMode() && state.selectedDotKey && state.pixels[state.selectedDotKey]) {
+          const [sx, sy] = state.selectedDotKey.split(',').map(Number);
+          ctx.strokeStyle = '#FACC15';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(sx * cell + 1, sy * cell + 1, cell - 2, cell - 2);
+        }
+      }
+
+      function getCanvasCoords(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const cell = getCellSize();
+        const x = Math.floor((clientX - rect.left) * (canvas.width / rect.width) / cell);
+        const y = Math.floor((clientY - rect.top) * (canvas.height / rect.height) / cell);
+        if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return null;
+        return { x, y };
+      }
+
+      async function handleCanvasClick(x, y) {
+        const key = x + ',' + y;
+
+        // CREATOR MODE: clicking any painted dot reveals ONLY to Marian which country placed it
+        if (isCreatorMode()) {
+          if (state.pixels[key]) {
+            state.selectedDotKey = key;
+            renderInspector();
+            drawCanvas();
+          } else {
+            state.selectedDotKey = null;
+            renderInspector();
+            drawCanvas();
+            showToast('Ця клітинка ще вільна');
+          }
+          return;
+        }
+
+        // PARTICIPANT MODE: strictly 1 pixel per person AND only on an empty cell
+        if (getUserPlacedKey()) {
+          showToast(state.lang === 'uk' ? 'Ти вже поставив(ла) свою єдину крапку!' : 'You already placed your 1 pixel!');
+          return;
+        }
+
+        // Sync latest state before placing so nobody overwrites another person's dot
+        if (cleanFbUrl(state.firebaseUrl)) await cloudPull(true);
+
+        if (state.pixels[key]) {
+          showToast(state.lang === 'uk' ? 'Це місце вже зайняте! Обери вільну клітинку.' : 'This spot is taken! Pick an empty cell.');
+          return;
+        }
+
+        const cObj = COUNTRIES.find(c => c.code === state.visitorCountry) || COUNTRIES[0];
+        state.pixels[key] = {
+          color: state.selectedColor,
+          country: cObj.code,
+          flag: cObj.flag,
+          time: nowStr()
+        };
+        setUserPlacedKey(key);
+        saveState();
+        renderAll();
+        showToast(state.lang === 'uk' ? 'Твою крапку додано на Pixel One!' : 'Your pixel is now on Pixel One!');
+      }
+
+      // ==================== RENDER UI ====================
+      function renderInspector() {
+        const empty = document.getElementById('dotInspectorEmpty');
+        const details = document.getElementById('dotInspectorDetails');
+        const coordEl = document.getElementById('inspectedCoord');
+        const key = state.selectedDotKey;
+        const p = key ? state.pixels[key] : null;
+
+        if (!p) {
+          coordEl.textContent = '—';
+          empty.classList.remove('hidden');
+          details.classList.add('hidden');
+          return;
+        }
+
+        const cObj = COUNTRIES.find(c => c.code === p.country) || { flag: p.flag || '🇪🇺', name: p.country || 'Europe' };
+        coordEl.textContent = `X:${key.split(',')[0]} Y:${key.split(',')[1]}`;
+        document.getElementById('inspectedFlag').textContent = cObj.flag;
+        document.getElementById('inspectedCountry').textContent = cObj.name;
+        document.getElementById('inspectedTime').textContent = p.time || '';
+        document.getElementById('inspectedColorSwatch').style.backgroundColor = p.color;
+        empty.classList.add('hidden');
+        details.classList.remove('hidden');
+      }
+
+      function renderPalette() {
+        document.getElementById('colorPalette').innerHTML = PALETTE.map(hex => {
+          const active = state.selectedColor === hex;
+          return `<button type="button" data-color="${hex}" class="pal-btn w-7 h-7 rounded-lg border border-white/20 transition ${active ? 'swatch-active' : 'hover:scale-105'}" style="background-color:${hex};" aria-label="Color ${hex}"></button>`;
+        }).join('');
+      }
+
+      function renderAll() {
+        const dict = I18N[state.lang] || I18N.uk;
+        const creator = isCreatorMode();
+
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const k = el.getAttribute('data-i18n');
+          if (dict[k]) el.textContent = dict[k];
+        });
+        document.getElementById('langToggleBtn').textContent = state.lang === 'uk' ? '🇺🇦 UA' : '🇪🇺 EN';
+
+        // Role-specific visibility
+        document.getElementById('creatorStatsBar').classList.toggle('hidden', !creator);
+        document.getElementById('creatorSidebar').classList.toggle('hidden', !creator);
+        document.getElementById('participantBar').classList.toggle('hidden', creator);
+        document.getElementById('paletteBar').classList.toggle('hidden', creator);
+        document.getElementById('toggleRolePreviewBtn').classList.toggle('hidden', isPublicFile());
+
+        const canvasCol = document.getElementById('canvasCol');
+        canvasCol.classList.toggle('lg:col-span-8', creator);
+        canvasCol.classList.toggle('lg:col-span-12', !creator);
+
+        document.getElementById('roleBadge').textContent = creator ? "АВТОР • МАР'ЯН" : '2026';
+        document.getElementById('headerSub').textContent = creator ? dict.hint_creator : dict.one_dot_rule;
+        document.getElementById('canvasModeHint').textContent = creator ? dict.hint_creator : dict.hint_part;
+        document.getElementById('toggleRoleLabel').textContent = creator ? 'Режим учасника' : 'Режим автора';
+
+        // Participant status
+        const placed = Boolean(getUserPlacedKey());
+        const statusPill = document.getElementById('participantStatusPill');
+        statusPill.textContent = placed ? dict.part_done : dict.part_ready;
+        statusPill.className = placed
+          ? 'px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-semibold'
+          : 'px-3.5 py-2 rounded-xl bg-euroBlue/15 border border-euroBlue/40 text-blue-200 text-xs sm:text-sm font-semibold';
+
+        // Creator stats & country breakdown
+        const keys = Object.keys(state.pixels);
+        const counts = {};
+        keys.forEach(k => {
+          const p = state.pixels[k];
+          if (p && p.country) counts[p.country] = (counts[p.country] || 0) + 1;
+        });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+        document.getElementById('statViews').textContent = String(Number(state.views) || 0);
+        document.getElementById('statDots').textContent = String(keys.length);
+        document.getElementById('statCountries').textContent = String(sorted.length);
+        document.getElementById('statFreeCells').textContent = String(Math.max(0, TOTAL_CELLS - keys.length));
+        document.getElementById('adminFirebaseUrl').value = state.firebaseUrl || '';
+        updateSyncUI(Boolean(cleanFbUrl(state.firebaseUrl)));
+
+        const lb = document.getElementById('countryLeaderboard');
+        if (!sorted.length) {
+          lb.innerHTML = '<div class="text-slate-500 py-1">Поки що жодної крапки не поставлено.</div>';
+        } else {
+          const maxV = sorted[0][1] || 1;
+          lb.innerHTML = sorted.map(([code, cnt]) => {
+            const c = COUNTRIES.find(x => x.code === code) || { flag: '🇪🇺', name: code };
+            const pct = Math.max(8, Math.round((cnt / maxV) * 100));
+            return `
+              <div class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-slate-200">${c.flag} ${escapeHTML(c.name)}</span>
+                  <span class="font-mono text-euroGold font-bold">${cnt}</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-night overflow-hidden">
+                  <div class="h-full rounded-full bg-gradient-to-r from-euroBlue to-euroGold" style="width:${pct}%"></div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        renderPalette();
+        renderInspector();
+        drawCanvas();
+      }
+
+      // ==================== EVENTS ====================
+      const countrySelect = document.getElementById('visitorCountrySelect');
+      countrySelect.innerHTML = COUNTRIES.map(c => `<option value="${c.code}">${c.flag} ${c.name}</option>`).join('');
+      countrySelect.addEventListener('change', e => {
+        state.visitorCountry = e.target.value;
+        saveState(true);
+      });
+
+      document.getElementById('toggleRolePreviewBtn').addEventListener('click', () => {
+        if (isPublicFile()) return;
+        state.role = state.role === 'creator' ? 'participant' : 'creator';
+        state.selectedDotKey = null;
+        renderAll();
+      });
+
+      document.getElementById('langToggleBtn').addEventListener('click', () => {
+        state.lang = state.lang === 'uk' ? 'en' : 'uk';
+        saveState(true);
+        renderAll();
+      });
+
+      canvas.addEventListener('mousemove', e => {
+        const pos = getCanvasCoords(e.clientX, e.clientY);
+        if (pos) document.getElementById('coordReadout').textContent = `X: ${pos.x} Y: ${pos.y}`;
+      });
+
+      canvas.addEventListener('click', e => {
+        const pos = getCanvasCoords(e.clientX, e.clientY);
+        if (pos) handleCanvasClick(pos.x, pos.y);
+      });
+
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length !== 1) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        const pos = getCanvasCoords(t.clientX, t.clientY);
+        if (pos) handleCanvasClick(pos.x, pos.y);
+      }, { passive: false });
+
+      window.addEventListener('resize', drawCanvas);
+
+      document.getElementById('colorPalette').addEventListener('click', e => {
+        const btn = e.target.closest('.pal-btn');
+        if (!btn) return;
+        state.selectedColor = btn.getAttribute('data-color');
+        renderPalette();
+      });
+
+      document.getElementById('toggleGridBtn').addEventListener('click', () => { state.showGrid = !state.showGrid; drawCanvas(); });
+      document.getElementById('zoomInBtn').addEventListener('click', () => {
+        state.zoom = Math.min(2.5, Number((state.zoom + 0.25).toFixed(2)));
+        document.getElementById('zoomResetBtn').textContent = Math.round(state.zoom * 100) + '%';
+        drawCanvas();
+      });
+      document.getElementById('zoomOutBtn').addEventListener('click', () => {
+        state.zoom = Math.max(0.75, Number((state.zoom - 0.25).toFixed(2)));
+        document.getElementById('zoomResetBtn').textContent = Math.round(state.zoom * 100) + '%';
+        drawCanvas();
+      });
+      document.getElementById('zoomResetBtn').addEventListener('click', () => {
+        state.zoom = 1;
+        document.getElementById('zoomResetBtn').textContent = '100%';
+        drawCanvas();
+      });
+
+      document.getElementById('downloadPngBtn').addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = 'pixel-one.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        showToast('PNG збережено!');
+      });
+
+      document.getElementById('deleteInspectedDotBtn').addEventListener('click', () => {
+        if (!state.selectedDotKey) return;
+        delete state.pixels[state.selectedDotKey];
+        state.selectedDotKey = null;
+        saveState();
+        renderAll();
+        showToast('Крапку видалено');
+      });
+
+      document.getElementById('adminClearCanvasBtn').addEventListener('click', () => {
+        state.pixels = {};
+        state.selectedDotKey = null;
+        try { localStorage.removeItem(PLACED_KEY); } catch (e) {}
+        saveState();
+        renderAll();
+        showToast('Полотно очищено');
+      });
+
+      document.getElementById('cloudForm').addEventListener('submit', e => {
+        e.preventDefault();
+        state.firebaseUrl = cleanFbUrl(document.getElementById('adminFirebaseUrl').value);
+        saveState();
+        startPolling();
+        showToast('Firebase підключено!');
+      });
+
+      document.getElementById('testFbBtn').addEventListener('click', async () => {
+        state.firebaseUrl = cleanFbUrl(document.getElementById('adminFirebaseUrl').value);
+        if (!state.firebaseUrl) { showToast('Встав Firebase URL'); return; }
+        const ok = await cloudPush();
+        showToast(ok ? 'Зв’язок з Firebase працює!' : 'Помилка підключення');
+      });
+
+      function exportDotsHtml(filename, publicOnly) {
+        const baked = { publicOnly, firebaseUrl: state.firebaseUrl };
+        const tag = '<script id="bakedDotsConfig">window.__BAKED_DOTS_CONFIG__ = ' + JSON.stringify(baked).replace(/</g, '\\u003c') + ';<\/script>';
+        let fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        fullHtml = fullHtml.replace(/<script id="bakedDotsConfig">[\s\S]*?<\/script>/g, '');
+        fullHtml = fullHtml.replace('</head>', tag + '\n</head>');
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast(`${filename} збережено!`);
+      }
+
+      document.getElementById('exportPublicBtn').addEventListener('click', () => exportDotsHtml('index.html', true));
+      document.getElementById('exportAdminBtn').addEventListener('click', () => exportDotsHtml('admin.html', false));
+
+      // Init
+      loadState();
+      countrySelect.value = state.visitorCountry;
+
+      // Count unique participant view (only in public file, not when Marian opens admin)
+      if (isPublicFile()) {
+        let seen = false;
+        try { seen = sessionStorage.getItem('eurodots_seen') === '1'; } catch (e) {}
+        if (!seen) {
+          try { sessionStorage.setItem('eurodots_seen', '1'); } catch (e) {}
+          state.views = (Number(state.views) || 0) + 1;
+          saveState();
+        }
+      }
+
+      renderAll();
+      startPolling();
+      if (window.lucide) window.lucide.createIcons();
+    })();
+  </script>
+</body>
+</html>
